@@ -20,7 +20,7 @@ def preprocess_flood_raster(flood_event_id,red_band_pixel_value_threshold):
     flood_rasters_dir= "C:\\Users\\jdeclet-barreto\\Documents\\EPIF\\data\\CFO\\flood_extent_rasters"
 
     #find flood raster based on flood_event_id
-    Unprojected_Flood_Extent_Raster = glob.glob(flood_rasters_dir + "\\*" + flood_event_id + "*.tif")[0]
+    Unprojected_Flood_Extent_Raster = glob.glob(flood_rasters_dir + "\\*" + Flood_Event_ID + "*.tif")[0]
 
     arcpy.CheckOutExtension("Spatial")
     arcpy.env.overwriteOutput = True 
@@ -41,21 +41,30 @@ def preprocess_flood_raster(flood_event_id,red_band_pixel_value_threshold):
     Raster_blue_band_lyr="Raster_blue_band_lyr"
     Raster_green_band_lyr="Raster_green_band_lyr"
     Raster_floodwater_in_red_band = overlay_analysis_gdb + "\\Event_" + Flood_Event_ID + "_red_band_floodwaters"
+    Raster_floodwater_in_red_band_reclass = overlay_analysis_gdb + "\\Event_" + Flood_Event_ID + "_red_band_floodwaters_reclass"
+    unprojected_raster_red_band_lyr="unprojected_raster_red_band_lyr"
+    reclass_map = "0 " + str(red_band_pixel_value_threshold - 1) +" 0;" + str(red_band_pixel_value_threshold) + " 255 1;NODATA 0"       
+
+
+    Raster_floodwater_in_red_band_unprojected = overlay_analysis_gdb + "\\Event_" + Flood_Event_ID + "_red_band_floodwaters_unprojected"
+    Raster_floodwater_in_red_band_unprojected_reclass = overlay_analysis_gdb + "\\Event_" + Flood_Event_ID + "_red_band_floodwaters_unprojected_reclass"
+    
     Raster_floodwater_temp = overlay_analysis_gdb + "\\Event_" + Flood_Event_ID + "_floodwaters_temp"
     Raster_floodwater_final = overlay_analysis_gdb + "\\Event_" + Flood_Event_ID + "_floodwaters_final"
     Flood_event_poly = overlay_analysis_gdb + "\\Event_" + Flood_Event_ID + "_poly"
     Flood_event_bbox = overlay_analysis_gdb + "\\Event_" + Flood_Event_ID + "_bbox"
     Flood_event_FEMA_flood_zones = overlay_analysis_gdb + "\\Event_" + Flood_Event_ID + "_FEMA_flood_zones"
     flood_zones_qry="FLD_ZONE LIKE 'V%' OR FLD_ZONE LIKE 'A%' OR ZONE_SUBTY = '0.2 PCT ANNUAL CHANCE FLOOD HAZARD'"
-    resampling_type = "MAJORITY"
+    #resampling_type = "MAJORITY"
     resampling_type = "NEAREST"
 
     print ("PROCESS STARTING: Pre-process flood raster on " + str(datetime.datetime.now()))
     print ("Flood Event ID: " + Flood_Event_ID)
     print ("Flood Raster: " + Unprojected_Flood_Extent_Raster)
-    print ("Red Band Threshold: " +  red_band_pixel_value_threshold)
+    print ("Red Band Threshold: " +  str(red_band_pixel_value_threshold))
     print ("Projection Resampling Algorithm: " +  resampling_type)
-
+    print ("Reclass map: " + str(reclass_map))
+    
     # Process: Delete gdb if exists
     print ("deleting %s." % overlay_analysis_gdb) 
     delete = arcpy.Delete_management("C:\\Users\\jdeclet-barreto\\Documents\\EPIF\\data\\overlay_analysis\\Event_" + Flood_Event_ID + ".gdb" , "")
@@ -72,6 +81,11 @@ def preprocess_flood_raster(flood_event_id,red_band_pixel_value_threshold):
     # Process: Extract Raster by Attributes
     print ("\textracting raster by attributes")
     arcpy.gp.ExtractByAttributes_sa(Unprojected_Flood_Extent_Raster, "\"Value\">0", Raster_with_valid_values)
+    
+    # Process: Extract Unprojected Raster by Attributes
+    #print ("\textracting floodwater from unprojected raster")
+    #qry = "\"Value\">=" + str(red_band_pixel_value_threshold)
+    #arcpy.gp.ExtractByAttributes_sa(Raster_with_valid_values, qry, Raster_floodwater_in_red_band_unprojected)
 
     # Process: Project Raster
     print ("\tprojecting raster")
@@ -96,24 +110,20 @@ def preprocess_flood_raster(flood_event_id,red_band_pixel_value_threshold):
     #Now extract bands and get water pixels
     print ("2. Extracting floodwater")
     print ("\textracting red band")
-    #arcpy.MakeRasterLayer_management(in_raster=Unprojected_Flood_Extent_Raster, out_rasterlayer=Raster_red_band_lyr,   band_index="1")
     arcpy.MakeRasterLayer_management(in_raster=Raster_with_valid_values_projected, out_rasterlayer=Raster_red_band_lyr,   band_index="1")
 
-    print ("\textracting green band")
+    #print ("\textracting green band")
     #arcpy.MakeRasterLayer_management(in_raster=Unprojected_Flood_Extent_Raster, out_rasterlayer=Raster_green_band_lyr, band_index="2")
-    arcpy.MakeRasterLayer_management(in_raster=Raster_with_valid_values_projected, out_rasterlayer=Raster_green_band_lyr, band_index="2")
+    #arcpy.MakeRasterLayer_management(in_raster=Raster_with_valid_values_projected, out_rasterlayer=Raster_green_band_lyr, band_index="2")
 
-    print ("\textracting blue band")
+    #print ("\textracting blue band")
     #arcpy.MakeRasterLayer_management(in_raster=Unprojected_Flood_Extent_Raster, out_rasterlayer=Raster_blue_band_lyr,  band_index="3")
-    arcpy.MakeRasterLayer_management(in_raster=Raster_with_valid_values_projected, out_rasterlayer=Raster_blue_band_lyr,  band_index="3")
+    #arcpy.MakeRasterLayer_management(in_raster=Raster_with_valid_values_projected, out_rasterlayer=Raster_blue_band_lyr,  band_index="3")
 
     #extract flood water from redband (i.e., value=255)
     print ("\textracting floodwaters from redband")
-    red_band_qry = '"Value" >=' + str(red_band_pixel_value_threshold)
-    
+    red_band_qry = '"Value" >=' + str(red_band_pixel_value_threshold)    
     arcpy.gp.ExtractByAttributes_sa(Raster_red_band_lyr, red_band_qry, Raster_floodwater_in_red_band)
-    #arcpy.gp.ExtractByAttributes_sa(Raster_green_band_lyr, '"Value" <50 AND "Value" >0' , Raster_green_band)
-    #arcpy.gp.ExtractByAttributes_sa(Raster_blue_band_lyr,  '"Value" <50 AND "Value" >0' , Raster_blue_band)
 
     #print ("\tfinal band combination" )
     # Now combine with Boolean AND all three bands to get only floodwaters
@@ -121,11 +131,22 @@ def preprocess_flood_raster(flood_event_id,red_band_pixel_value_threshold):
     #arcpy.gp.BooleanAnd_sa(Raster_floodwater_in_red_band, Raster_green_band, Raster_floodwater_temp)
     # Process: Boolean And
     #arcpy.gp.BooleanAnd_sa(Raster_floodwater_temp, Raster_blue_band, Raster_floodwater_final)
-
+    
+    #accuracy assessment        
+    #Process: Extract Unprojected Raster by Attributes
+    print ("\treclassing unprojected floodwaters")
+    arcpy.MakeRasterLayer_management(in_raster=Unprojected_Flood_Extent_Raster, out_rasterlayer=unprojected_raster_red_band_lyr,   band_index="1")
+    arcpy.gp.Reclassify_sa(unprojected_raster_red_band_lyr, "Value", reclass_map , Raster_floodwater_in_red_band_unprojected_reclass, "DATA")
+    
+    #Process: Extract Projected Raster by Attributes
+    print ("\treclassing projected floodwaters")
+    #arcpy.MakeRasterLayer_management(in_raster=Unprojected_Flood_Extent_Raster, out_rasterlayer=unprojected_raster_red_band_lyr,   band_index="1")
+    arcpy.gp.Reclassify_sa(Raster_floodwater_in_red_band, "Value", reclass_map , Raster_floodwater_final, "DATA")
+        
     print ("Process ending for Flood Event ID " + Flood_Event_ID + " on " + str(datetime.datetime.now()))
 
 
 #flood_rasters_dir= "C:\\Users\\jdeclet-barreto\\Documents\\EPIF\\data\\CFO\\flood_extent_rasters"
-flood_event_id=sys.argv[1]
-red_band_pixel_value_threshold = sys.argv[2]
+flood_event_id=4676
+red_band_pixel_value_threshold = 255
 preprocess_flood_raster(flood_event_id,red_band_pixel_value_threshold)
